@@ -1,8 +1,8 @@
-(* 
+(*
  * ExtFloat - Extended floating-point numbers
  * Copyright (C) 2007 Bluestorm <bluestorm dot dylc on-the-server gmail dot com>
  *               2008 David Teller
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -36,7 +36,7 @@ module BaseFloat = struct
   let pow = ( ** )
 
   let compare = compare
-    
+
   let of_int = float_of_int
   let to_int = int_of_float
 
@@ -57,17 +57,6 @@ let approx_equal ?(epsilon = 1e-5) f1 f2 = abs_float (f1 -. f2) < epsilon
    not (approx_equal 1.5 1.45)
 **)
 
-include BatNumber.MakeNumeric(BaseFloat)
-module Infix = struct
-  include BatNumber.MakeInfix(BaseFloat)
-  let (=~) = approx_equal
-end
-module Compare = struct
-  include BatNumber.MakeCompare(BaseFloat)
-end
-
-external of_float : float -> float = "%identity"
-external to_float : float -> float = "%identity"
 external exp : float -> float = "caml_exp_float" "exp" "float"
 external log : float -> float = "caml_log_float" "log" "float"
 external log10 : float -> float = "caml_log10_float" "log10" "float"
@@ -84,8 +73,39 @@ external tanh : float -> float = "caml_tanh_float" "tanh" "float"
 external ceil : float -> float = "caml_ceil_float" "ceil" "float"
 external floor : float -> float = "caml_floor_float" "floor" "float"
 external frexp : float -> float * int = "caml_frexp_float"
-external ldexp : float -> int -> float = "caml_ldexp_float"            
+external ldexp : float -> int -> float = "caml_ldexp_float"
 external modf : float -> float * float = "caml_modf_float"
+
+let root m n =
+  if n < 0 then invalid_arg "Float.root: Negative root"
+  else if m < 0. && n land 1 <> 1 then
+    invalid_arg "Float.root: Imaginary result"
+  else if m < 0. then
+    -. exp (log (abs_float m) /. (float_of_int n))
+  else
+    exp (log m /. (float_of_int n))
+
+(**T root
+   approx_equal (root 9. 2) 3.
+   approx_equal (root 8. 3) 2.
+   approx_equal (root 1. 20) 1.
+ **)
+
+(* sign bit is top bit, shift all other 63 bits away and test if = one *)
+let signbit x = Int64.shift_right_logical (Int64.bits_of_float x) 63 = Int64.one
+
+let copysign x s =
+  if signbit s then
+    -. (abs_float x)
+  else
+    abs_float x
+
+(**T sign
+   signbit (-256.)
+   not (signbit 1e50)
+   copysign 1. 1. = 1.
+   copysign 1. (-1.) = (-1.)
+ **)
 
 let round x =
   (* we test x >= 0. rather than x > 0. because otherwise
@@ -107,35 +127,61 @@ let round_to_int x =
    Pervasives.(=) (List.map round_to_int [1.1; 2.4; 3.3; 3.5; 4.99]) [1; 2; 3; 4; 5]
 **)
 
+include BatNumber.MakeNumeric(BaseFloat)
+module Infix = struct
+  include BatNumber.MakeInfix(BaseFloat)
+  let (=~) = approx_equal
+end
+module Compare = struct
+  include BatNumber.MakeCompare(BaseFloat)
+end
+
+(* of_float and to_float are needed after including functors to fix
+   definitions *)
+external of_float : float -> float = "%identity"
+external to_float : float -> float = "%identity"
+
 type bounded = t
 let min_num, max_num = neg_infinity, infinity
 
-type fpkind = Pervasives.fpclass = 
-	      | FP_normal           
-	      | FP_subnormal        
-	      | FP_zero             
-	      | FP_infinite         
-	      | FP_nan              
+type fpkind = Pervasives.fpclass =
+	      | FP_normal
+	      | FP_subnormal
+	      | FP_zero
+	      | FP_infinite
+	      | FP_nan
 external classify : float -> fpkind = "caml_classify_float"
-    
+
 let is_nan f = match classify f with
   | FP_nan -> true
   | _      -> false
 
 let is_special f =
   match classify f with
-  | FP_nan
-  | FP_infinite -> true
-  | FP_normal
-  | FP_subnormal
-  | FP_zero -> false
+    | FP_nan
+    | FP_infinite -> true
+    | FP_normal
+    | FP_subnormal
+    | FP_zero -> false
 
 let infinity     = Pervasives.infinity
 let neg_infinity = Pervasives.neg_infinity
 let nan          = Pervasives.nan
 let epsilon      = Pervasives.epsilon_float
-let pi           = 4. *. atan 1.
-  
+let e = 2.7182818284590452354
+let log2e = 1.4426950408889634074
+let log10e = 0.43429448190325182765
+let ln2 = 0.69314718055994530942
+let ln10 = 2.30258509299404568402
+let pi = 3.14159265358979323846
+let pi2 = 1.57079632679489661923
+let pi4 = 0.78539816339744830962
+let invpi = 0.31830988618379067154
+let invpi2 = 0.63661977236758134308
+let sqrtpi2 = 1.12837916709551257390
+let sqrt2 = 1.41421356237309504880
+let invsqrt2 = 0.70710678118654752440
+
 let print out t = BatInnerIO.nwrite out (to_string t)
 let t_printer paren out t = print out t
 
@@ -143,10 +189,10 @@ let t_printer paren out t = print out t
 let round_to_string ?(digits=0) x =
   if Pervasives.(<) digits 0 then invalid_arg "Float.round_to_string";
   match classify x with
-    | FP_normal           
-    | FP_subnormal        
+    | FP_normal
+    | FP_subnormal
     | FP_zero ->
-        BatInnerIO.Printf.sprintf "%.*f" digits x
+      BatInnerIO.Printf.sprintf "%.*f" digits x
     (* we don't call sprintf in the 'special' cases as it seems to
        behave weirdly in some cases (eg. on Windows, bug #191) *)
     | FP_infinite ->
@@ -223,25 +269,25 @@ module Safe_float = struct
 
   type bounded = t
   let min_num, max_num = neg_infinity, infinity
-    
-  type fpkind = Pervasives.fpclass = 
-		| FP_normal           
-		| FP_subnormal        
-		| FP_zero             
-		| FP_infinite         
-		| FP_nan              
+
+  type fpkind = Pervasives.fpclass =
+		| FP_normal
+		| FP_subnormal
+		| FP_zero
+		| FP_infinite
+		| FP_nan
   external classify : float -> fpkind = "caml_classify_float"
-      
+
   let is_nan f = match classify f with
     | FP_nan -> true
     | _      -> false
-      
+
   let infinity     = Pervasives.infinity
   let neg_infinity = Pervasives.neg_infinity
   let nan          = Pervasives.nan
   let epsilon      = Pervasives.epsilon_float
   let pi           = 4. *. atan 1.
-    
+
   external of_float : float -> float = "%identity"
   external to_float : float -> float = "%identity"
 

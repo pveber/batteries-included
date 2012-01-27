@@ -14,6 +14,23 @@ let doc_intro = "build/intro.text"
 let mkconf = "build/mkconf.byte"
 let pa_llist = "src/syntax/pa_llist/pa_llist.cmo"
 
+(* removes the trailing newlines in the stdout of s *)
+let run_and_read s =
+  let res = run_and_read s in
+  String.chomp res
+
+(* Throws exception if bisect not installed - ignore this exception *)
+let bisect_dir = try run_and_read "ocamlfind query bisect" with _ -> "."
+let bisect_pp = Pathname.concat bisect_dir "bisect_pp.cmo"
+
+let src_bat_ml =
+  let l = Array.to_list (Pathname.readdir "src") in
+  let l =
+    List.filter (fun filename ->
+      String.is_prefix "bat" filename && String.is_suffix filename ".ml"
+    ) l in
+  List.map (fun filename -> Pathname.concat "src" filename) l
+
 let _ = dispatch begin function
   | Before_options ->
       (* Set up to use ocamlfind *)
@@ -48,6 +65,31 @@ let _ = dispatch begin function
         ~deps:["META.in"; mkconf]
         begin fun env build ->
           Cmd(S[A"ocamlrun"; P mkconf; P"META.in"; P"META"])
+        end;
+
+      rule "code coverage"
+        ~prod:"coverage/index.html"
+        ~deps:src_bat_ml
+        begin fun env build ->
+          List.iter (fun filename ->
+            tag_file filename ["with_pa_bisect"; "syntax_camlp4o"; "use_bisect"];
+          ) src_bat_ml;
+          let test_exes = [
+            "testsuite/main.native";
+            "qtest/test_runner.native";
+            "qtest2/all_tests.native";
+          ] in
+          List.iter (fun exe -> tag_file exe ["use_bisect"]) test_exes;
+          List.iter Outcome.ignore_good (build (
+            List.map (fun exe -> [exe]) test_exes
+          ));
+          Seq ([
+            Cmd(S[Sh"rm -f bisect*.out"]);
+          ] @
+            List.map (fun exe -> Cmd(S[A exe])) test_exes
+          @ [
+            Cmd(S[Sh"bisect-report -html coverage bisect*.out"]);
+          ])
         end
 
   | After_rules ->
@@ -102,19 +144,28 @@ let _ = dispatch begin function
         S[A"-ppopt"; P pa_llist];
       dep ["ocaml"; "ocamldep"; "with_pa_llist"] [pa_llist];
 
+      let flags_pa_bisect =
+        S[A"-ppopt"; P"str.cma"; A"-ppopt"; P bisect_pp;
+          A"-ppopt"; A"-disable"; A"-ppopt"; A"b"] in
+      (* bisect screws up polymorphic recursion without -disable b *)
+      flag ["ocaml"; "compile";  "with_pa_bisect"] & flags_pa_bisect;
+      flag ["ocaml"; "ocamldep";  "with_pa_bisect"] & flags_pa_bisect;
+
+      ocaml_lib ~extern:true ~dir:bisect_dir "bisect";
+
       ocaml_lib "qtest/test_mods";
       ocaml_lib "src/batteries";
       ocaml_lib "src/batteriesThread";
 
       flag ["ocaml"; "link"; "linkall"] & S[A"-linkall"];
 (*
-      dep ["ocaml"; "link"; "include_tests"; "byte"] & 
+      dep ["ocaml"; "link"; "include_tests"; "byte"] &
 	[Pathname.mk "qtest/test_mods.cma"];
-      dep ["ocaml"; "link"; "include_tests"; "native"] & 
+      dep ["ocaml"; "link"; "include_tests"; "native"] &
 	[Pathname.mk "qtest/test_mods.cmxa"]; *)
 
       (* Some .mli files use INCLUDE "foo.mli" to avoid interface duplication;
-         
+
          The problem is that the automatic dependency detector of
          ocamlbuild doesn't detect the implicit dependency on the
          included .mli, and doesn't copy it into _build before
@@ -127,8 +178,8 @@ let _ = dispatch begin function
       *)
       dep ["ocaml"; "doc"; "extension:html"] & [doc_intro];
       flag ["ocaml"; "doc"; "extension:html"] &
-        (S[A"-t"; A"Batteries user guide"; 
-           A"-intro"; P doc_intro; 
+        (S[A"-t"; A"Batteries user guide";
+           A"-intro"; P doc_intro;
            A"-colorize-code"]);
 
   | _ -> ()

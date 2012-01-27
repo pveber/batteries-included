@@ -37,41 +37,64 @@ let rec find ur = match !ur with
 let uref x = ref (Ranked (x, 0))
 
 let uget ur = match !(find ur) with
+  | Ptr _ -> assert false
   | Ranked (x, _) -> x
-  | _ -> assert false
 
 let uset ur x =
   let ur = find ur in
   match !ur with
+    | Ptr _ -> assert false
     | Ranked (_, r) -> ur := Ranked (x, r)
-    | _ -> assert false
 
 let equal ur vr =
   find ur == find vr
 
-let unite ?(sel=(fun x y -> x)) ur vr =
+let unite ?sel ur vr =
+  (* we use ?sel instead of ?(sel=(fun x _y -> x)) because we want to be
+     able to know whether a selection function was passed, for
+     optimization purposes: when sel is the default (expected common
+     case), we can take a short path in the (ur == vr) case. *)
   let ur = find ur in
   let vr = find vr in
-  if ur == vr then () else
+  if ur == vr then begin
+    match sel with
+      | None -> ()
+      | Some sel ->
+        (* even when ur and vr are the same reference, we need to apply
+           the selection function, as [sel x x] may be different from [x].
+           
+           For example, [unite ~sel:(fun _ _ -> v) r r] would fail
+           to set the content of [r] to [v] otherwise. *)
+        match !ur with
+          | Ptr _ -> assert false
+          | Ranked (x, r) ->
+            let x' = sel x x in
+            ur := Ranked(x', r)
+  end 
+  else
     match !ur, !vr with
+      | _, Ptr _ | Ptr _, _ -> assert false
       | Ranked (x, xr), Ranked (y, yr) ->
+        let z = match sel with
+          | None -> x (* in the default case, pick x *)
+          | Some sel -> sel x y in
           if xr = yr then begin
-            ur := Ranked (sel x y, xr + 1) ;
+            ur := Ranked (z, xr + 1) ;
             vr := Ptr ur
           end else if xr < yr then begin
-            ur := Ranked (sel x y, xr) ;
+            ur := Ranked (z, xr) ;
             vr := Ptr ur
           end else begin
-            vr := Ranked (sel x y, yr) ;
+            vr := Ranked (z, yr) ;
             ur := Ptr vr
           end
-      | _ -> assert false
 
 let print elepr out ur = match !(find ur) with
+  | Ptr _ -> assert false
   | Ranked (x, _) ->
       BatInnerIO.nwrite out "uref " ;
-      elepr out x ;
-  | _ -> assert false
+      elepr out x
+      
 
 let t_printer elepr paren out ur =
   if paren then BatInnerIO.nwrite out "(" ;

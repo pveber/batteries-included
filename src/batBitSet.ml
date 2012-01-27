@@ -21,6 +21,7 @@
 
 (**{6 Black magic}*)
 
+(* Internal type for bit data - a string, but with a new type *)
 type intern
 
 let bcreate : int -> intern = Obj.magic String.create
@@ -31,111 +32,107 @@ let fast_blit : intern -> int -> intern -> int -> int -> unit = Obj.magic String
 let fast_fill : intern -> int -> int -> int (* char *) -> unit = Obj.magic String.fill
 let fast_length : intern -> int= Obj.magic String.length
 
-
-
+(* Safe access functions, still internal *)
+(* Get a byte of intern [s] at index [idx] *)
 let bget s ndx =
   assert (ndx >= 0 && ndx < fast_length s);
   fast_get s ndx
 
+(* Set a byte of intern [s] at index [ndx] to [v] *)
 let bset s ndx v =
   assert (ndx >= 0 && ndx < fast_length s);
   fast_set s ndx v
 
-let bblit src srcoff dst dstoff len = 
-  assert (srcoff >= 0 && dstoff >= 0 && len >= 0);
+(* Blit from one intern to another intern - sizes and offsets in bytes *)
+let bblit src srcoff dst dstoff len =
+  assert (srcoff >= 0 && dstoff >= 0 && len >= 0); (* FIXME: doesn't check upper-bounds of ranges *)
   fast_blit src srcoff dst dstoff len
 
-let bfill dst start len c = 
-  assert (start >= 0 && len >= 0);
+(* Fill a range of bits with a byte pattern [c] *)
+let bfill dst start len c =
+  assert (start >= 0 && len >= 0); (* FIXME: doesn't check upper bound of range *)
   fast_fill dst start len c
 
-exception Negative_index of string
-
 type t = {
-	mutable data : intern;
-	mutable len : int;
+  mutable data : intern; (* internal string of bits *)
+  mutable len : int;     (* size of data in bytes *)
 }
 
-let error fname = raise (Negative_index fname)
-
-let empty() =
-	{
-		data = bcreate 0;
-		len = 0;
-	}
+let empty() = { data = bcreate 0; len = 0; }
 
 let int_size = 7 (* value used to round up index *)
 let log_int_size = 3 (* number of shifts *)
 
-let create n =
-	if n < 0 then error "BitSet.create";
-	let size = (n+int_size) lsr log_int_size in
-	let b = bcreate size in
-	bfill b 0 size 0;
-	{
-		data = b;
-		len = size;
-	}
+let capacity {len} = len lsl log_int_size (* i.e. len * 8 *)
+let create n = (* n is in bits *)
+  if n < 0 then invalid_arg "BitSet.create: negative size";
+  let size = (n+int_size) lsr log_int_size in
+  let b = bcreate size in
+  bfill b 0 size 0;
+  { data = b; len = size; }
 
 let create_full n =
-  if n < 0 then error "BitSet.create_full";
+  if n < 0 then invalid_arg "BitSet.create_full: negative size";
   let size = (n+int_size) lsr log_int_size in
   let b = bcreate size in
   bfill b 0 size 0xFF;
-  {
-    data = b;
-    len = size;
-  }
+  { data = b; len = size; }
 
 
 let copy t =
-	let b = bcreate t.len in
-	bblit t.data 0 b 0 t.len;
-	{
-		data = b;
-		len = t.len
-	}
+  let b = bcreate t.len in
+  bblit t.data 0 b 0 t.len;
+  { data = b; len = t.len }
 
-let clone = copy
+(* FIXME: exponential resize for performance? *)
+let extend t len = (* len in bytes *)
+  let b = bcreate len in
+  bblit t.data 0 b 0 t.len;
+  bfill b t.len (len - t.len) 0x00;
+  {data = b; len = len }
 
 let set t x =
-	if x < 0 then error "set";
-	let pos = x lsr log_int_size and delta = x land int_size in
-	let size = t.len in
-	if pos >= size then begin
-		let b = bcreate (pos+1) in
-		bblit t.data 0 b 0 size;
-		bfill b size (pos - size + 1) 0;
-		t.len <- pos + 1;
-		t.data <- b;
-	end;
-	bset t.data pos ((bget t.data pos) lor (1 lsl delta))
+  if x < 0 then invalid_arg "BitSet.set: negative index";
+  let pos = x lsr log_int_size and delta = x land int_size in
+  let size = t.len in
+  if pos >= size then begin
+    let b = bcreate (pos+1) in
+    bblit t.data 0 b 0 size;
+    bfill b size (pos - size + 1) 0;
+    t.len <- pos + 1;
+    t.data <- b;
+  end;
+  bset t.data pos ((bget t.data pos) lor (1 lsl delta))
+
+let add x t = let dup = copy t in set dup x; dup
 
 let unset t x =
-	if x < 0 then error "unset";
-	let pos = x lsr log_int_size and delta = x land int_size in
-	if pos < t.len then
-		bset t.data pos ((bget t.data pos) land (0xFF lxor (1 lsl delta)))
+  if x < 0 then invalid_arg "BitSet.unset: negative index";
+  let pos = x lsr log_int_size and delta = x land int_size in
+  if pos < t.len then
+    bset t.data pos ((bget t.data pos) land (0xFF lxor (1 lsl delta)))
+
+let remove x t = let dup = copy t in unset dup x; dup
 
 let toggle t x =
-	if x < 0 then error "toggle";
-	let pos = x lsr log_int_size and delta = x land int_size in
-	let size = t.len in
-	if pos >= size then begin
-		let b = bcreate (pos+1) in
-		bblit t.data 0 b 0 size;
-		bfill b size (pos - size + 1) 0;
-		t.len <- pos + 1;
-		t.data <- b;
-	end;
-	bset t.data pos ((bget t.data pos) lxor (1 lsl delta))
+  if x < 0 then invalid_arg "BitSet.toggle: negative index";
+  let pos = x lsr log_int_size and delta = x land int_size in
+  let size = t.len in
+  if pos >= size then begin
+    let b = bcreate (pos+1) in
+    bblit t.data 0 b 0 size;
+    bfill b size (pos - size + 1) 0;
+    t.len <- pos + 1;
+    t.data <- b;
+  end;
+  bset t.data pos ((bget t.data pos) lxor (1 lsl delta))
 
 let put t = function
 	| true -> set t
 	| false -> unset t
 
-let is_set t x =
-  if x < 0 then error "is_set";
+let mem t x =
+  if x < 0 then invalid_arg "BitSet.mem";
   let pos = x lsr log_int_size and delta = x land int_size in
   let size = t.len in
   if pos < size then
@@ -149,22 +146,22 @@ exception Break_int of int
 (* Find highest set element or raise Not_found *)
 let find_msb t =
   (* Find highest set bit in a byte.  Does not work with zero. *)
-  let byte_msb b = 
+  let byte_msb b =
     assert (b <> 0);
-    let rec loop n = 
+    let rec loop n =
       if b land (1 lsl n) = 0 then
         loop (n-1)
       else n in
     loop 7 in
   let n = t.len - 1
   and buf = t.data in
-  try 
+  try
     for i = n downto 0 do
       let byte = bget buf i in
       if byte <> 0 then raise (Break_int ((i lsl log_int_size)+(byte_msb byte)))
     done;
     raise Not_found
-  with 
+  with
     Break_int n -> n
   | _ -> raise Not_found
 
@@ -181,11 +178,11 @@ let compare t1 t2 =
         begin
           (* MSBs differ, we need to scan arrays until we find a
              difference *)
-          let ndx = a lsr log_int_size in 
+          let ndx = a lsr log_int_size in
           assert (ndx < t1.len && ndx < t2.len);
           try
             for i = ndx downto 0 do
-              let b1 = bget t1.data i 
+              let b1 = bget t1.data i
               and b2 = bget t2.data i in
               if b1 <> b2 then raise (Break_int (compare b1 b2))
             done;
@@ -223,33 +220,40 @@ let partial_count t x =
 let count t =
   partial_count t 0
 
-(* Find the first set bit in the bit array *)
-let find_first_set b n =
-  (* TODO there are many ways to speed this up.  Lookup table would be
-     one way to speed this up. *)
-  let find_lsb b =
-    assert (b <> 0);
-    let rec loop n =
-      if b land (1 lsl n) <> 0 then n else loop (n+1) in
-    loop 0 in
+let find_lsb b = (* find the least set bit in a byte *)
+  let rec loop n = if b land (1 lsl n) <> 0 then n else loop (n+1) in
+  if b = 0 then (-1) else loop 0
 
+(* Computed Constant: array of 256 positions of least set bit *)
+let lsb_table = Array.init (1 lsl (1 lsl log_int_size)) (fun i -> find_lsb i)
+
+(* Find the first set bit in the bit array *)
+let next_set_bit b n =
+  if n < 0 then invalid_arg "BitSet.next_set_bit";
   let buf = b.data in
-  let rec find_bit byte_ndx bit_offs =
-    if byte_ndx >= b.len then
-      None
+  let rec find_set_bit byte_ndx =
+    if byte_ndx >= b.len then None (* Not found *)
     else
-      let byte = (bget buf byte_ndx) lsr bit_offs in
-      if byte = 0 then
-        find_bit (byte_ndx + 1) 0
-      else
-        Some ((find_lsb byte) + (byte_ndx lsl log_int_size) + bit_offs) in
-  find_bit (n lsr log_int_size) (n land int_size)
-      
+      let byte = bget buf byte_ndx in
+      if byte = 0 then (* keep looking next byte *)
+	find_set_bit (byte_ndx + 1)
+      else (* Done *)
+	Some (lsb_table.(byte) + byte_ndx lsl log_int_size)
+  in
+  let byte_ndx = n lsr log_int_size in
+  let bit_offs = n land int_size in
+  (* get the current byte, but shift by bit_offs; dropping ignored bits *)
+  let byte = (bget buf byte_ndx) lsr bit_offs in
+  if byte = 0 then (* use aux function to search *)
+    find_set_bit (byte_ndx + 1)
+  else (* in current byte *)
+    Some (lsb_table.(byte) + n)
+
 let enum t =
   let rec make n =
     let cur = ref n in
     let rec next () =
-      match find_first_set t !cur with
+      match next_set_bit t !cur with
         Some elem ->
           cur := (elem+1);
           elem
@@ -262,7 +266,11 @@ let enum t =
   in
   make 0
 
-let raw_create size = 
+let of_enum ?(cap=128) e = let bs = create cap in BatEnum.iter (set bs) e; bs
+
+let of_list ?(cap=128) lst = let bs = create cap in List.iter (set bs) lst; bs
+
+let raw_create size =
   let b = bcreate size in
   bfill b 0 size 0;
   { data = b; len = size }
@@ -281,7 +289,7 @@ let inter a b =
 
 (* Note: rest of the array is handled automatically correct, since we
    took a copy of the bigger set. *)
-let union a b = 
+let union a b =
   let d = if a.len > b.len then copy a else copy b in
   let sl = min a.len b.len in
   let abuf = a.data
@@ -291,7 +299,7 @@ let union a b =
   done;
   d
 
-let diff a b = 
+let diff a b =
   let maxlen = max a.len b.len in
   let buf = bcreate maxlen in
   bblit a.data 0 buf 0 a.len;
@@ -311,7 +319,7 @@ let diff a b =
   done;
   { data = buf; len = maxlen }
 
-let sym_diff a b = 
+let sym_diff a b =
   let maxlen = max a.len b.len in
   let buf = bcreate maxlen in
   (* Copy larger (assumes missing bits are zero) *)
@@ -348,7 +356,7 @@ let differentiate_sym t t' =
   t.len <- d.len
 
 (*print a BitSet between [| and |]*)
-(*let print ?(first="[|") ?(last="|]") ?(sep="") out t = 
+(*let print ?(first="[|") ?(last="|]") ?(sep="") out t =
   let print_bit i =
     if is_set t i then BatInnerIO.write out '1'
     else               BatInnerIO.write out '0'
@@ -364,7 +372,7 @@ let differentiate_sym t t' =
     end*)
 let print out t =
   let print_bit i =
-    BatInnerIO.write out (if is_set t i then '1' else '0')
+    BatInnerIO.write out (if mem t i then '1' else '0')
   in
   for i = 0 to 8*t.len - 1 do
     print_bit i

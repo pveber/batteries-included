@@ -124,9 +124,15 @@ val sum : int t -> int
   (** [sum] returns the sum of the given int enum.  If the argument is
       empty, returns 0. Eager *)
 
+val fsum : float t -> float
+(** @returns the sum of the enum's elements.  Uses Kahan summing to
+    get a more accurate answer than [reduce (+.)] would return, but runs slower.
+    @since 2.0
+ *)
+
 val fold2 : ('a -> 'b -> 'c -> 'c) -> 'c -> 'a t -> 'b t -> 'c
-  (** [fold2] is similar to [fold] but will fold over two enumerations at the
-      same time until one of the two enumerations ends. *)
+(** [fold2] is similar to [fold] but will fold over two enumerations at the
+    same time until one of the two enumerations ends. *)
 
 val scanl : ('b -> 'a -> 'b) -> 'b -> 'a t -> 'b t
 (** A variant of [fold] producing an enumeration of its intermediate values.
@@ -166,6 +172,18 @@ val find : ('a -> bool) -> 'a t -> 'a
       can be used several times on the same enumeration to find the
       next element. *)
 
+val find_map : ('a -> 'b option) -> 'a t -> 'b
+(** [find_map f e] finds the first element [x] of [e] such that [f x] returns
+    [Some r], then returns r. It consumes the enumeration up to and including
+    the found element, or raises [Not_found] if no such element exists in the
+    enumeration, consuming the whole enumeration in the search.
+
+    Since [find_map] (eagerly) consumes a prefix of the enumeration, it can be
+    used several times on the same enumeration to find the next element.
+
+    @since 2.0
+*)
+
 val is_empty : 'a t -> bool
 (** [is_empty e] returns true if [e] does not contains any element.
     Forces at most one element. *)
@@ -179,6 +197,11 @@ val get : 'a t -> 'a option
   (** [get e] returns [None] if [e] is empty or [Some x] where [x] is
       the next element of [e], in which case the element is removed
       from the enumeration. *)
+
+val get_exn : 'a t -> 'a
+  (** [get_exn e] returns the first element of [e].
+      @raises No_more_elements if [e] is empty.
+      @since 2.0 *)
 
 val push : 'a t -> 'a -> unit
   (** [push e x] will add [x] at the beginning of [e]. *)
@@ -537,6 +560,11 @@ val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
       where [x] is the first element of [a] and [y] is the first
       element of [b]
   *)
+
+val equal : ('a -> 'a -> bool) -> 'a t -> 'a t -> bool
+(** [equal eq a b] returns [true] when [a] and [b] contain
+    the same sequence of elements.
+*)
 
 val switch : ('a -> bool) -> 'a t -> 'a t * 'a t
   (** [switch test enum] splits [enum] into two enums, where the first enum have

@@ -15,15 +15,15 @@ For the moment, Batteries Included concentrates on:
 }
 
 For more information on the installation of Batteries Included,
-please read the {{:https://github.com/ocaml-batteries-team/batteries-included/wiki/Installing-Batteries}Installation guide} and for an example using it in different build systems, we have the {{:https://github.com/ocaml-batteries-team/batteries-included/wiki/Getting-started}Getting started manual}. 
+please read the {{:https://github.com/ocaml-batteries-team/batteries-included/wiki/Installing-Batteries}Installation guide} and for an example using it in different build systems, we have the {{:https://github.com/ocaml-batteries-team/batteries-included/wiki/Getting-started}Getting started manual}.
 
 Do you have suggestions? Remarks? Bug reports ? To contact us or to
-be kept informed, don't hesitate to visit our 
+be kept informed, don't hesitate to visit our
 {{:http://batteries.forge.ocamlcore.org/}website}, {{:https://github.com/ocaml-batteries-team/batteries-included}Git repo}, and our {{:https://github.com/ocaml-batteries-team/batteries-included/issues?sort=created&direction=desc&state=open}Issue tracker}.
 
 {6 New Modules in Batteries}
 
-{!modules: BatBase64 BatBitSet BatCache BatCharParser BatDeque BatDllist BatDynArray BatEnum BatFile BatGlobal BatHashcons BatHeap BatIMap BatISet BatInterfaces BatIO BatLazyList BatLog BatLogger BatMultiPMap BatNumber BatOptParse BatParserCo BatPathGen BatPrint BatRefList BatResult BatReturn BatSeq BatSplay BatUref BatVect}
+{!modules: BatBase64 BatBitSet BatCache BatCharParser BatDeque BatDllist BatDynArray BatEnum BatFile BatFingerTree BatGlobal BatHashcons BatHeap BatIMap BatISet BatInterfaces BatIO BatLazyList BatLog BatLogger BatMultiPMap BatNumber BatOptParse BatParserCo BatPathGen BatPrint BatRefList BatResult BatReturn BatSeq BatSplay BatUref BatVect}
 
 {6 Extensions to the Standard Library (and base types)}
 
@@ -37,9 +37,9 @@ These modules are available only when compiling with threads.
 
 {6 Future}
 
-These modules are available only inside BatFuture.  Their interface is not guaranteed stable, and may be changed at any time.
+These modules are available only inside [Batteries.Future].  Their interface is not guaranteed stable, and may be changed at any time.  They are included for testing and stabilization until they can be finalized and moved to batteries proper.
 
-{!modules: BatCounter BatHistogram BatOrd}
+{!modules: BatOrd BatSubstring}
 
 {6 Internal Modules}
 

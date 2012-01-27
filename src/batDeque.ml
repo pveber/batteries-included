@@ -22,6 +22,8 @@ type 'a dq = { front : 'a list ; flen : int ;
                rear : 'a list  ; rlen : int }
 
 type 'a t = 'a dq
+type 'a enumerable = 'a t
+type 'a mappable = 'a t
 
 let empty = { front = [ ] ; flen = 0 ;
               rear  = [ ] ; rlen = 0 }
@@ -32,67 +34,80 @@ let size q =
 let cons x q =
   { q with front = x :: q.front ; flen = q.flen + 1 }
 
-(**T cons_one_size
+(*$T cons
    size (cons 1 empty) = 1
    to_list(cons 1 empty) <> to_list(cons 2 empty)
- **)
+*)
 
-(**Q cons_qt
-   (Q.list Q.pos_int) ~count:10 (fun l -> List.fold_left (flip cons) empty l |> to_list = List.rev l)
- **)
+(*$Q cons
+  (Q.list Q.pos_int) ~count:10 \
+    (fun l -> List.fold_left (flip cons) empty l |> to_list = List.rev l)
+*)
 
 let snoc q x =
   { q with rear = x :: q.rear ; rlen = q.rlen + 1 }
 
-(**T cons_one_eq_snoc_one
+(*$T cons; snoc
    to_list(cons 1 empty) = to_list(snoc empty 1)
    to_list(cons 1 (cons 2 empty)) = (to_list (snoc (snoc empty 2) 1) |> List.rev)
- **)
+*)
 
-(**Q snoc_eq_rev
+(*$Q snoc
    (Q.list Q.int) (fun l -> List.fold_left snoc empty l |> to_list = l)
- **)
+*)
 
 let front q =
-  match q.front with
-    | h :: front -> Some (h, { q with front = front ; flen = q.flen - 1 })
-    | _ ->
-        match q.rear with
-          | [] -> None
-          | _ ->
-              let front = List.rev q.rear in
-              Some (List.hd front, { front = List.tl front ;
-                                     flen = q.rlen - 1 ;
-                                     rear = [] ;
-                                     rlen = 0 })
+  match q with
+  | {front = h :: front; flen = flen} ->
+    Some (h, { q with front = front ; flen = flen - 1 })
+  | {rear = []} ->
+    None
+  | {rear = rear; rlen = rlen} ->
+    (* beware: when rlen = 1, we must put the only element of
+     * the deque at the front (ie new_flen = 1, new_rlen = 0) *)
+    let new_flen = (rlen + 1) / 2 in
+    let new_rlen = rlen / 2 in
+    (* we split the non empty list in half because if we transfer
+     * everything to the front, then a call to rear would also
+     * transfer everything to the rear etc. -> no amortization
+     * (but we could transfer 3/4 instead of 1/2 of the list for instance) *)
+    let rear, rev_front = BatList.split_at new_rlen rear in
+    let front = List.rev rev_front in
+    Some (List.hd front, { front = List.tl front ;
+                           flen = new_flen - 1 ;
+                           rear = rear ;
+                           rlen = new_rlen })
 
-(**T front
+(*$T front
    front(cons 1 empty) = Some(1,empty)
    front(snoc empty 1) = Some(1,empty)
- **)
+*)
 
 let rear q =
-  match q.rear with
-    | t :: rear -> Some ({ q with rear = rear ; rlen = q.rlen - 1 }, t)
-    | _ ->
-        match q.front with
-          | [] -> None
-          | _ ->
-              let rear = List.rev q.front in
-              Some ({ front = [] ; flen = 0 ;
-                      rear = List.tl rear ; rlen = q.flen - 1 },
-                    List.hd rear)
+  match q with
+  | {rear = t :: rear; rlen = rlen} ->
+    Some ({ q with rear = rear ; rlen = rlen - 1 }, t)
+  | {front = []} ->
+    None
+  | {front = front; flen = flen} ->
+    let new_rlen = (flen + 1) / 2 in
+    let new_flen = flen / 2 in
+    let front, rev_rear = BatList.split_at new_flen front in
+    let rear = List.rev rev_rear in
+    Some ({ front = front ; flen = new_flen ;
+            rear = List.tl rear ; rlen = new_rlen - 1 },
+          List.hd rear)
 
-(**T rear
+(*$T rear
    match rear(empty |> cons 1 |> cons 2) with | Some(_, 1) -> true | _ -> false
- **)
+*)
 
 let rev q = { front = q.rear ; flen = q.rlen ;
               rear = q.front ; rlen = q.flen }
 
-(**Q rev
+(*$Q rev
    (Q.list Q.pos_int) (fun l -> let q = of_list l in rev q |> to_list = List.rev l)
- **)
+*)
 
 let of_list l = { front = l ; flen = List.length l ;
                   rear = [] ; rlen = 0 }
@@ -228,10 +243,11 @@ let rec enum q =
 let of_enum e =
   BatEnum.fold snoc empty e
 
-(**Q enumerable
+(*$Q enum
    (Q.list Q.int) (fun l -> List.of_enum (enum (List.fold_left snoc empty l)) = l)
-   (Q.list Q.int) (fun l -> to_list (of_enum (List.enum l)) = l)
-**)
+*)(*$Q of_enum
+  (Q.list Q.int) (fun l -> to_list (of_enum (List.enum l)) = l)
+*)
 
 let print ?(first="[") ?(last="]") ?(sep="; ") elepr out dq =
   let rec spin dq = match front dq with
@@ -247,9 +263,11 @@ let print ?(first="[") ?(last="]") ?(sep="; ") elepr out dq =
   spin dq ;
   BatInnerIO.nwrite out last
 
-(**Q printing
-   (Q.list Q.int) (fun l -> BatIO.to_string (print ~first:"<" ~last:">" ~sep:"," Int.print) (of_list l) = BatIO.to_string (List.print ~first:"<" ~last:">" ~sep:"," Int.print) l)
-**)
+(*$Q print
+  (Q.list Q.int) (fun l -> \
+    BatIO.to_string (print ~first:"<" ~last:">" ~sep:"," Int.print) (of_list l) \
+    = BatIO.to_string (List.print ~first:"<" ~last:">" ~sep:"," Int.print) l)
+*)
 
 let t_printer elepr paren out x = print (elepr false) out x
 let dq_printer elepr paren out x =  print (elepr false) out x

@@ -1,7 +1,7 @@
-(* 
+(*
  * Ref - Operations on references
  * Copyright (C) 2008 David Teller
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -72,4 +72,13 @@ external set : 'a ref -> 'a -> unit = "%setfield0"
 external get : 'a ref -> 'a = "%field0"
     (** As [ ! ]*)
 
-let print print_a out x = print_a out !x
+let print print_a out r = print_a out !r
+
+let toggle r = r := not !r
+
+let oset r x = r := Some x
+
+let oget_exn r = match !r with None -> raise Not_found | Some x -> x
+
+let ord o x y = o !x !y
+let eq e x y = e !x !y

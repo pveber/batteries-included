@@ -44,10 +44,9 @@ module Legacy = struct
 end
 
 (* stdlib modules *)
-module Arg = struct include Arg include BatArg end
 module Array = struct include Array include BatArray end
 (* ArrayLabels *)
-module Buffer = struct include Buffer include BatBuffer end
+module Buffer = BatBuffer
 (* Callback *)
 module Char = struct include Char include BatChar end
 module Complex = BatComplex
@@ -62,7 +61,7 @@ module Int32 = BatInt32
 module Int64 = BatInt64
 (* Lazy *)
 module Lexing = struct include Lexing include BatLexing end
-module List = struct include List include BatList end
+module List = BatList
 (* ListLabels *)
 module Map = BatMap
 module Marshal = struct include Marshal include BatMarshal end
@@ -110,7 +109,7 @@ module IO = BatIO
 module LazyList = BatLazyList
 module MultiPMap = BatMultiPMap
 module Option = BatOption
-module OptParse = BatOptParse
+(* REMOVED, Extlib only module OptParse = BatOptParse *)
 module RefList = BatRefList
 module Ref = BatRef
 (*module Std = REMOVED - use BatPervasives *)
@@ -121,6 +120,7 @@ module CharParser = BatCharParser
 module Deque = BatDeque
 module Hashcons = BatHashcons
 module Heap = BatHeap
+module FingerTree = BatFingerTree
 module Logger = BatLogger
 module ParserCo = BatParserCo
 module PathGen = BatPathGen
@@ -139,7 +139,6 @@ module ISet = BatISet
 module IMap = BatIMap
 module Splay = BatSplay
 module Uref = BatUref
-module Substring = BatSubstring
 module Text = Ulib.Text
 module Concurrent = BatConcurrent
 
@@ -152,8 +151,9 @@ module Bool = BatBool
 module Unit = BatUnit
 
 (* Modules in-progress, API stability not guaranteed *)
-module Future = struct
+module Incubator = struct
   module Log = BatLog
+  module Substring = BatSubstring
 end
 
 (* Pervasives last *)

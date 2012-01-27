@@ -11,7 +11,7 @@ let buffer = BatArray.of_enum (BatEnum.take 60 (BatRandom.State.enum_int state 2
 (**Write sample to temporary file*)
 let write buf =
   let (out, name) = open_temporary_out ~mode:[`delete_on_exit] () in
-    write_bytes out (BatArray.enum buf);
+    BatEnum.iter (write_byte out) (BatArray.enum buf);
     close_out out;
     name
 
@@ -79,11 +79,11 @@ let test_no_append () =
   try
     let temp   = temp_file "ocaml_batteries" "noappend_test" in
     let out    = open_out temp                       in
-    let _      = write_bytes out (BatArray.enum buffer) in
+    let _      = BatEnum.iter (write_byte out) (BatArray.enum buffer) in
     let _      = close_out out                       in
     let size_1 = size_of temp                        in
     let out    = open_out temp                       in
-    let _      = write_bytes out (BatArray.enum buffer) in
+    let _      = BatEnum.iter (write_byte out) (BatArray.enum buffer) in
     let _      = close_out out                       in
     let size_2 = size_of temp                        in
       if size_1 <> size_2 then assert_failure
@@ -94,33 +94,33 @@ let test_append () =
   try
     let temp   = temp_file "ocaml_batteries" "append_test" in
     let out    = open_out ~mode:[`append] temp       in
-    let _      = write_bytes out (BatArray.enum buffer) in
+    let _      = BatEnum.iter (write_byte out) (BatArray.enum buffer) in
     let _      = close_out out                       in
     let size_1 = size_of temp                        in
     let out    = open_out ~mode:[`append] temp       in
-    let _      = write_bytes out (BatArray.enum buffer) in
+    let _      = BatEnum.iter (write_byte out) (BatArray.enum buffer) in
     let _      = close_out out                       in
     let size_2 = size_of temp                        in
       if size_2 <> 2*size_1 then assert_failure
-	(BatPrintf.sprintf "Expected a files with size %d, got a first chunk with size %d and a second chunk with size %d" 
+	(BatPrintf.sprintf "Expected a files with size %d, got a first chunk with size %d and a second chunk with size %d"
 	   (2*size_1) size_1 size_2)
   with Sys_error e -> assert_failure (BatPrintf.sprintf "Got Sys_error %S" e)
 
-let test_lines_of () = 
-  let file_lines_of fn = 
+let test_lines_of () =
+  let file_lines_of fn =
     let ic = Pervasives.open_in fn in
     BatEnum.suffix_action
       (fun () -> Pervasives.close_in ic)
       (BatEnum.from (fun () -> try Pervasives.input_line ic with End_of_file -> raise BatEnum.No_more_elements))
   in
-  try 
+  try
     let open Batteries in
     let tf = temp_file "batteries" "test" in
     BatFile.write_lines tf (BatList.enum [ "First" ; "Second" ]) ;
     (file_lines_of tf
        /@ (fun x -> String.length x, 42)
        |> Enum.group Tuple2.first)
-    |> List.of_enum 
+    |> List.of_enum
     |> ignore
   with Sys_error e -> assert_failure (BatPrintf.sprintf "Got Sys_error %S" e)
 

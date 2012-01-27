@@ -1,4 +1,3 @@
-(* $Id: avlTree.ml,v 1.2 2003/06/08 04:50:48 yori Exp $ *)
 (* Copyright 2003 Yamagata Yoriyuki. distributed with LGPL *)
 (* Modified by Edgar Friendly <thelema314@gmail.com> *)
 
@@ -52,12 +51,12 @@ let rec bal l v r =
       Empty -> assert false
     | Node (rl, rv, rr, _) ->
 	if height rr >= height rl then
-	  create (create l v rl) rv rr 
+	  create (create l v rl) rv rr
 	else
 	  match rl with
 	    Empty -> assert false
 	  | Node (rll, rlv, rlr, _) ->
-	      create (create l v rll) rlv (create rlr rv rr) 
+	      create (create l v rll) rlv (create rlr rv rr)
   else
     create l v r
 
@@ -118,7 +117,7 @@ let rec fold f t init =
       let x = fold f l init in
       let x = f v x in
       fold f r x
-	
+
 let rec enum = function
   | Empty             -> BatEnum.empty ()
   | Node (l, v, r, _) ->

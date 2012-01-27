@@ -79,7 +79,7 @@ val trimr : int -> t -> t
       application [trimr k].
   *)
 
-val get : int -> t -> char
+val get : t -> int -> char
   (** [sub sus k] returns the k'th character of the substring; that
       is, s(i+k) where sus = (s, i, n).  Raises [Invalid_argument] if
       [k<0] or [k>=n].  *)
@@ -125,6 +125,24 @@ val compare : t -> t -> int
    given ordering cmp on characters.  Equivalent to, but more efficient
    than, String.collate cmp (string sus1, string sus2).
 *)
+
+val index : t -> char -> int
+(** [index sus c] returns the index of the first occurence of [c] in [sus] or
+    raise [Not_found] otherwise. *)
+
+val index_from : t -> int -> char -> int
+(** [index_from sus i c] returns the index of the first occurence of [c] in
+    [sus] after the index [i] or raise [Not_found] otherwise. If [i] is beyond
+    the range of [sus], raises [Invalid_argument]. It is equivalent to [i + index (triml i sus) c]. *)
+
+val rindex : t -> char -> int
+(** [rindex sus c] returns the index of the last occurence of [c] in [sus] or
+    raise [Not_found] otherwise. *)
+
+val rindex_from : t -> int -> char -> int
+(** [index_from sus i c] returns the index of the last occurence of [c] in [sus]
+    before the index [i] or raise [Not_found] otherwise. If [i] is beyond the
+    range of [sus], raises [Invalid_argument]. It is equivalent to [rindex (trimr i sus) c]. *)
 
 val dropl : (char -> bool) -> t -> t
 (** [dropl p sus] drops the longest prefix (left substring) of [sus]

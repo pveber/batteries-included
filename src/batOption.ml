@@ -2,7 +2,7 @@
  * Option - functions for the option type
  * Copyright (C) 2003 Nicolas Cannasse
  *               2008 David Teller (Contributor)
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -18,7 +18,7 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *)
- 
+
 exception No_value
 
 type 'a t = 'a option
@@ -89,10 +89,10 @@ let get_exn s e = match s with
    try get_exn (Some true) Exit with Exit -> false
 **)
 
-let get s = get_exn s Not_found
+let get s = get_exn s (Invalid_argument "Option.get")
 (**T get
-   try get None with Not_found -> true
-   try get (Some true) with Not_found -> false
+   try get None with Invalid_argument _ -> true
+   try get (Some true) with Invalid_argument _ -> false
  **)
 
 let map_default f v = function
@@ -121,8 +121,8 @@ let compare ?(cmp=Pervasives.compare) a b = match a with
 **)
 
 
-let eq ?(eq=(=)) x y = match x,y with 
-  | None, None -> true 
+let eq ?(eq=(=)) x y = match x,y with
+  | None, None -> true
   | Some a, Some b -> eq a b
   | _ -> false
 
@@ -135,7 +135,7 @@ let eq ?(eq=(=)) x y = match x,y with
 let enum = function
         | None   -> BatEnum.from (fun () -> raise BatEnum.No_more_elements)
         | Some e -> BatEnum.singleton e
-(**T enum 
+(**T enum
    BatList.of_enum (enum None) = []
    BatList.of_enum (enum (Some 3)) = [3]
 **)
@@ -187,4 +187,3 @@ struct
 end
 
 include Infix
-

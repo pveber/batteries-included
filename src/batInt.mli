@@ -188,10 +188,8 @@ val xprint: 'a BatInnerIO.output -> int -> unit
 val t_printer : t BatValuePrinter.t
 
 (** {7 Compare} *)
-module Future : sig
-  val eq : int -> int -> bool
-  val ord : int -> int -> BatOrd.order
-end
+val eq : int -> int -> bool
+val ord : int -> int -> BatOrd.order
 
 (**
     Safe operations on integers.
@@ -291,10 +289,10 @@ module Safe_int : sig
   val ( = )  : t -> t -> bool
   (** Comparaison: [a = b] if and only if [a] and [b] have the same value.*)
 
-  val min_num : t
+  val max_num : t
   (** The greatest representable integer, which is either 2{^30}-1 or 2{^62}-1. *)
 
-  val max_num : t
+  val min_num : t
   (** The smallest representable integer, -2{^30} or 2{^62}. *)
 
   val succ: t -> t
@@ -350,9 +348,6 @@ module Safe_int : sig
     val print: 'a BatInnerIO.output -> t -> unit
 
     (** {7 Compare} *)
-    module Future : sig
-      val eq : t -> t -> bool
-      val ord : t -> t -> BatOrd.order
-    end
+    val eq : t -> t -> bool
+    val ord : t -> t -> BatOrd.order
   end
-

@@ -1,8 +1,8 @@
-(* 
+(*
  * ExtChar - Additional character operations
  * Copyright (C) 1996 Xavier Leroy
  *               2008 David Teller
- * 
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -63,7 +63,7 @@ let is_latin1 c = is_uppercase_latin1 c || is_lowercase_latin1 c
   external unsafe_int : char-> int  = "%identity"
   external unsafe_chr : int -> char = "%identity"
 
-  let enum () = 
+  let enum () =
     BatEnum.map unsafe_chr (BatEnum.( -- ) 0 255)
 
   let ( -- ) from last =
@@ -81,6 +81,13 @@ let is_latin1 c = is_uppercase_latin1 c || is_lowercase_latin1 c
 
   let print out t = BatInnerIO.write out t
   let t_printer paren out t = print out t
+
+  let cmp (x:char) y = Pervasives.compare x y
+  let ord (x:char) y =
+    if x > y then BatOrd.Gt
+    else if y > x then BatOrd.Lt
+    else BatOrd.Eq
+  let eq (x:char) y = x == y (* safe because int-like value *)
 
 module Incubator = struct
   module Comp = struct
